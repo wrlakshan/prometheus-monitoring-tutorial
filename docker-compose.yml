@@ -1,17 +1,20 @@
 services:
+  # The coin-api service definition
   coin-api:
-    container_name: coin-api
-    build:
-      context: .
-      dockerfile: ./Dockerfile
+    container_name: coin-api # Sets a custom name for the container
+    build: # Specifies how to build the image
+      context: . # Sets the build context to the current directory
+      dockerfile: ./Dockerfile # Points to the Dockerfile used for building the image
     ports:
-      - '5000:5000'
-    restart: 'on-failure'
+      - '5000:5000' # Maps port 5000 of the container to port 5000 on the host
+    restart: 'on-failure' # The service will restart if it exits due to an error
+
+  # The cadvisor service monitors the performance of running containers
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: coin-api-cadvisor
-    restart: always
-    volumes:
+    image: gcr.io/cadvisor/cadvisor:latest # Uses the latest cadvisor image
+    container_name: coin-api-cadvisor # Sets a custom name for the container
+    restart: always # Always restart the service regardless of the exit status
+    volumes: # Mounts several volumes for cadvisor to access host system information
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /:/rootfs:ro
@@ -22,52 +25,61 @@ services:
     devices:
       - /dev/kmsg:/dev/kmsg
     depends_on:
-      - coin-api
+      - coin-api # Specifies that cadvisor depends on coin-api
+
+  # Prometheus service for monitoring and alerting
   prometheus:
-    image: prom/prometheus:latest
-    container_name: coin-api-prometheus
+    image: prom/prometheus:latest # Uses the latest Prometheus image
+    container_name: coin-api-prometheus # Sets a custom name for the container
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - ./prometheus:/etc/prometheus
-    command:
+      - ./prometheus:/etc/prometheus # Mounts the Prometheus configuration directory
+    command: # Custom command to run Prometheus with specified config file
       - '--config.file=/etc/prometheus/prometheus.yml'
     ports:
-      - '9090:9090'
+      - '9090:9090' # Maps port 9090 of the container to port 9090 on the host
+
+  # Alertmanager handles alerts sent by client applications such as Prometheus
   alertmanager:
-    image: prom/alertmanager:v0.23.0
+    image: prom/alertmanager:v0.23.0 # Uses a specific version of Alertmanager
     restart: unless-stopped
     ports:
       - "9093:9093"
     volumes:
-      - "./alertmanager:/config"
-      - alertmanager-data:/data
-    command: --config.file=/config/alertmanager.yml --log.level=debug --cluster.advertise-address=0.0.0.0:9093
+      - "./alertmanager:/config" # Mounts the Alertmanager configuration directory
+      - alertmanager-data:/data # Uses a named volume for persistent data storage
+    command: # Command to run Alertmanager with specific configurations
+      --config.file=/config/alertmanager.yml --log.level=debug --cluster.advertise-address=0.0.0.0:9093
+
+  # Service to send alerts to a Discord server using a webhook
   discord-alerts:
-    image: benjojo/alertmanager-discord
+    image: benjojo/alertmanager-discord # Uses a custom image to integrate Alertmanager with Discord
     container_name: discord-alerts
     restart: unless-stopped
     environment:
-      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
+      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL} # Uses an environment variable for the Discord webhook URL
     ports:
-      - 9094:9094
+      - 9094:9094 # Maps port 9094 of the container to port 9094 on the host
+
+  # Grafana service for visualizing data from sources like Prometheus
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:latest # Uses the latest Grafana image
     container_name: coin-api-grafana
     restart: always
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - grafana-storage:/var/lib/grafana
-    user: "1000"
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini # Mounts the Grafana configuration file
+      - ./grafana/provisioning:/etc/grafana/provisioning # Mounts the provisioning directory for data sources and dashboards
+      - grafana-storage:/var/lib/grafana # Uses a named volume for Grafana's persistent data storage
+    user: "1000" # Runs Grafana as a non-root user with UID 1000
     depends_on:
-      - prometheus
+      - prometheus # Specifies that Grafana depends on Prometheus
     ports:
-      - "3000:3000"
+      - "3000:3000" # Maps port 3000 of the container to port 3000 on the host
 
 volumes:
-  alertmanager-data:
-  grafana-storage:
+  alertmanager-data: # Defines a named volume for Alertmanager data
+  grafana-storage: # Defines a named volume for Grafana data
